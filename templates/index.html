@@ -18,7 +18,7 @@
         <div class="p-4 space-y-6">
             <nav class="space-y-2">
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
-                    <i class="ph ph-house text-xl"></i> Hogar
+                    <i class="ph ph-house text-xl"></i> Home
                 </a>
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
                     <i class="ph ph-bookmark-simple text-xl"></i> Marcadores 
@@ -36,14 +36,6 @@
                 <i class="ph ph-plus-bold"></i> Nuevo chat
             </button>
 
-            <div class="mt-6">
-                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Chats</h3>
-                <div class="space-y-1">
-                    <button class="w-full text-left px-3 py-2 bg-rose-50 text-rose-900 rounded-lg text-sm font-medium truncate">
-                        Angustia Por Ruptura Amorosa
-                    </button>
-                </div>
-            </div>
         </div>
 
         <div class="p-4">
@@ -85,7 +77,7 @@
                 <textarea id="user-input" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 p-2 resize-none max-h-32 text-gray-700 placeholder-gray-400 outline-none" placeholder="Escribe aquí..."></textarea>
 
                 <div class="flex items-center gap-2 pb-1 pr-1">
-                    <button class="p-2 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 border border-gray-200">
+                    <button id="mic-btn" class="p-2 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 border border-gray-200 transition" title="Click to record audio">
                         <i class="ph ph-microphone text-lg"></i>
                     </button>
                     <button id="send-btn" class="p-2 bg-gray-900 text-white rounded-full hover:bg-gray-700 transition shadow-md flex items-center justify-center">
@@ -104,6 +96,11 @@
         const chatContainer = document.getElementById('chat-container');
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
+        const micBtn = document.getElementById('mic-btn');
+
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
 
         function appendMessage(text, isUser) {
             const wrapper = document.createElement('div');
@@ -122,18 +119,12 @@
             chatContainer.scrollTop = chatContainer.scrollHeight;
         }
 
-        async function sendMessage() {
-            const text = userInput.value.trim();
-            if (!text) return;
-
-            appendMessage(text, true);
-            userInput.value = '';
-
+        async function sendMessage(messageData) {
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify(messageData)
                 });
                 const data = await response.json();
                 appendMessage(data.response, false);
@@ -143,11 +134,69 @@
             }
         }
 
-        sendBtn.addEventListener('click', sendMessage);
+        async function sendTextMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage(text, true);
+            userInput.value = '';
+            await sendMessage({ message: text });
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {
+                        const base64Audio = reader.result.split(',')[1];
+                        appendMessage("🎵 Audio message sent", true);
+                        await sendMessage({ audio: base64Audio, type: 'audio/webm' });
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                micBtn.classList.add('bg-red-100', 'text-red-600');
+                micBtn.title = 'Click to stop recording';
+            } catch (error) {
+                console.error("Microphone access denied:", error);
+                appendMessage("No se pudo acceder al micrófono. Intenta de nuevo.", false);
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                micBtn.classList.remove('bg-red-100', 'text-red-600');
+                micBtn.title = 'Click to record audio';
+            }
+        }
+
+        micBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
+
+        sendBtn.addEventListener('click', sendTextMessage);
         userInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
-                sendMessage();
+                sendTextMessage();
             }
         });
     </script>
