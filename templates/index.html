@@ -142,6 +142,10 @@
         let audioChunks = [];
         let isRecording = false;
         let currentMode = 'amigo';
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let animationId;
 
         function appendMessage(text, isUser) {
             const wrapper = document.createElement('div');
@@ -191,6 +195,13 @@
                 mediaRecorder = new MediaRecorder(stream);
                 audioChunks = [];
 
+                // Set up Web Audio API for real-time visualization
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                const source = audioContext.createMediaStreamSource(stream);
+                source.connect(analyser);
+
                 mediaRecorder.ondataavailable = (event) => {
                     audioChunks.push(event.data);
                 };
@@ -205,13 +216,14 @@
                     };
                     reader.readAsDataURL(audioBlob);
                     stream.getTracks().forEach(track => track.stop());
+                    audioContext.close();
                 };
 
                 mediaRecorder.start();
                 isRecording = true;
                 micBtn.classList.add('bg-red-100', 'text-red-600');
                 waveContainer.classList.remove('hidden');
-                animateWaves();
+                animateRealtimeWaves();
                 micBtn.title = 'Click to stop recording';
             } catch (error) {
                 console.error("Microphone access denied:", error);
@@ -219,19 +231,24 @@
             }
         }
 
-        let waveAnimation;
-        function animateWaves() {
+        function animateRealtimeWaves() {
             const lines = document.querySelectorAll('#audio-wave line');
-            let frame = 0;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
             const animate = () => {
-                frame++;
+                analyser.getByteFrequencyData(dataArray);
+                
                 lines.forEach((line, i) => {
-                    const height = Math.sin((frame + i * 2) * 0.05) * 6 + 8;
+                    const index = Math.floor((i / lines.length) * dataArray.length);
+                    const value = dataArray[index] / 255;
+                    const height = value * 10 + 2;
+                    
                     line.setAttribute('y2', (12 + height));
                     line.setAttribute('y1', (12 - height));
                 });
+
                 if (isRecording) {
-                    waveAnimation = requestAnimationFrame(animate);
+                    animationId = requestAnimationFrame(animate);
                 }
             };
             animate();
@@ -241,12 +258,20 @@
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
-                cancelAnimationFrame(waveAnimation);
+                cancelAnimationFrame(animationId);
                 waveContainer.classList.add('hidden');
                 micBtn.classList.remove('bg-red-100', 'text-red-600');
                 micBtn.title = 'Click to record audio';
             }
         }
+
+        micBtn.addEventListener('click', () => {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        });
 
         herramientasBtn.addEventListener('click', () => {
             modeMenu.classList.toggle('hidden');

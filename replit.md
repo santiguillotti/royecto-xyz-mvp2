@@ -49,7 +49,9 @@ python main.py
 - Changed background to light sky blue (#E6F2FF)
 - Updated title to "Sesion de Psiquiatria de Marle"
 - Added Herramientas mode selector (Professional Therapist vs. Empathetic Friend)
-- Added animated SVG audio waves (rose-purple gradient) during recording
+- Implemented real-time audio wave visualization (like WhatsApp) using Web Audio API
+- Waves now respond to actual audio frequency data while recording
+- Fixed microphone button to properly start/stop recording
 - Backend now responds differently based on selected mode
 
 ## Future Enhancements
