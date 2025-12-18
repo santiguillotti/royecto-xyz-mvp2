@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProyectoXYZ - Soporte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-[#FFF5F5] font-sans text-gray-800 h-screen flex overflow-hidden">
+
+    <aside class="w-64 bg-white border-r border-gray-100 flex flex-col justify-between hidden md:flex">
+        <div class="p-4 space-y-6">
+            <nav class="space-y-2">
+                <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
+                    <i class="ph ph-house text-xl"></i> Hogar
+                </a>
+                <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
+                    <i class="ph ph-bookmark-simple text-xl"></i> Marcadores 
+                    <span class="ml-auto bg-yellow-400 text-xs font-bold px-1.5 py-0.5 rounded text-white">PRO</span>
+                </a>
+                <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
+                    <i class="ph ph-file-text text-xl"></i> Crisis
+                </a>
+                <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 hover:bg-gray-50 rounded-lg font-medium transition">
+                    <i class="ph ph-user text-xl"></i> Perfil
+                </a>
+            </nav>
+
+            <button onclick="location.reload()" class="w-full bg-gray-900 text-white py-2.5 rounded-lg flex items-center justify-center gap-2 hover:bg-gray-800 transition shadow-lg">
+                <i class="ph ph-plus-bold"></i> Nuevo chat
+            </button>
+
+            <div class="mt-6">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Chats</h3>
+                <div class="space-y-1">
+                    <button class="w-full text-left px-3 py-2 bg-rose-50 text-rose-900 rounded-lg text-sm font-medium truncate">
+                        Angustia Por Ruptura Amorosa
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4">
+            <button class="w-full bg-gray-900 text-white py-2 rounded-full text-sm font-medium flex items-center justify-center gap-2">
+                <i class="ph ph-crown"></i> Actualizar a PRO
+            </button>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative bg-[#FFF5F5]">
+        
+        <header class="md:hidden p-4 flex justify-between items-center bg-white border-b">
+            <h1 class="font-bold">ProyectoXYZ</h1>
+            <button><i class="ph ph-list text-2xl"></i></button>
+        </header>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-32">
+            
+            <div class="flex gap-4 max-w-3xl mx-auto">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-rose-400 flex-shrink-0"></div>
+                <div class="space-y-1">
+                    <div class="text-gray-800 leading-relaxed">
+                        Hola. Lamento mucho que estés pasando por este momento. Estoy aquí para escucharte y apoyarte. ¿Quieres contarme qué sucedió?
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#FFF5F5] via-[#FFF5F5] to-transparent pt-10 pb-6 px-4">
+            <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex items-end gap-2">
+                
+                <button class="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
+                    <div class="flex items-center gap-1 border rounded-full px-3 py-1 text-sm font-medium">
+                        <i class="ph ph-wrench"></i> Herramientas
+                    </div>
+                </button>
+
+                <textarea id="user-input" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 p-2 resize-none max-h-32 text-gray-700 placeholder-gray-400 outline-none" placeholder="Escribe aquí..."></textarea>
+
+                <div class="flex items-center gap-2 pb-1 pr-1">
+                    <button class="p-2 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 border border-gray-200">
+                        <i class="ph ph-microphone text-lg"></i>
+                    </button>
+                    <button id="send-btn" class="p-2 bg-gray-900 text-white rounded-full hover:bg-gray-700 transition shadow-md flex items-center justify-center">
+                        <i class="ph ph-paper-plane-right text-lg"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="text-center mt-2">
+                <p class="text-xs text-gray-400">La IA puede cometer errores. Verifica la información importante.</p>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        const chatContainer = document.getElementById('chat-container');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+
+        function appendMessage(text, isUser) {
+            const wrapper = document.createElement('div');
+            wrapper.className = "flex gap-4 max-w-3xl mx-auto " + (isUser ? "justify-end" : "");
+            
+            const avatar = isUser ? '' : `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-rose-400 flex-shrink-0"></div>`;
+            const bubbleClass = isUser ? "bg-gray-100 px-4 py-2 rounded-2xl rounded-tr-sm" : "text-gray-800 leading-relaxed";
+            
+            wrapper.innerHTML = `
+                ${!isUser ? avatar : ''}
+                <div class="${bubbleClass}">
+                    ${text}
+                </div>
+            `;
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const text = userInput.value.trim();
+            if (!text) return;
+
+            appendMessage(text, true);
+            userInput.value = '';
+
+            try {
+                const response = await fetch('/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                const data = await response.json();
+                appendMessage(data.response, false);
+            } catch (error) {
+                console.error("Error:", error);
+                appendMessage("Lo siento, tuve un error de conexión.", false);
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
