@@ -8,7 +8,12 @@ import os
 from pathlib import Path
 from openai import OpenAI
 import logging
-import uuid  # Librería para generar IDs únicos
+import uuid
+from sqlalchemy import create_engine, Column, String, Text, Integer, ForeignKey, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+from datetime import datetime
+import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -19,61 +24,85 @@ templates = Jinja2Templates(directory="templates")
 AUDIO_DIR = Path("audio_messages")
 AUDIO_DIR.mkdir(exist_ok=True)
 
-api_key = os.environ.get("OPENAI_API_KEY")
-if not api_key:
-    logger.warning("⚠️ NO SE ENCONTRÓ LA API KEY.")
-    client = None
-else:
-    client = OpenAI(api_key=api_key)
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
+# Si estamos en Render, usa la URL real. Si estamos en Replit probando, usa un archivo local sqlite.
+DATABASE_URL = os.environ.get("DATABASE_URL")
+if not DATABASE_URL:
+    logger.warning("⚠️ Usando base de datos local SQLite (No persistente en Render Free)")
+    DATABASE_URL = "sqlite:///./local_marle.db"
 
-# --- MEMORIA POR SESIÓN ---
-# Diccionario para guardar historiales separados por usuario
-# Estructura: { "session_id_xyz": [ {role: user, ...}, ... ] }
-user_sessions = {}
+# Corrección para SQLAlchemy (Render usa postgres:// pero SQLAlchemy quiere postgresql://)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+# --- MODELOS (TABLAS) ---
+class ChatSession(Base):
+    __tablename__ = "sessions"
+    id = Column(String, primary_key=True, index=True) # El UUID de la cookie
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True, index=True)
+    session_id = Column(String, ForeignKey("sessions.id"))
+    role = Column(String) # user, assistant, system
+    content = Column(Text)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# Crear tablas si no existen
+Base.metadata.create_all(bind=engine)
+
+# Dependencia para obtener la DB en cada petición
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+api_key = os.environ.get("OPENAI_API_KEY")
+client = OpenAI(api_key=api_key) if api_key else None
 
 PROMPTS = {
-    "amigo": "Eres un amigo cercano y empático. Tu tono es casual, cálido y comprensivo. Recuerda lo que el usuario te ha dicho antes.",
-    "profesional": "Eres un terapeuta profesional. Tu tono es clínico pero empático. Analizas patrones. Recuerda el historial del paciente."
+    "amigo": "Eres un amigo cercano y empático. Tu tono es casual, cálido y comprensivo.",
+    "profesional": "Eres un terapeuta profesional. Tu tono es clínico pero empático. Analizas patrones."
 }
 
-# --- GESTIÓN DE COOKIES ---
-async def get_session_id(request: Request, response: Response):
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request, db: Session = Depends(get_db)):
+    response = templates.TemplateResponse("index.html", {"request": request})
+
+    # Gestión de Cookie
     session_id = request.cookies.get("session_id")
     if not session_id:
         session_id = str(uuid.uuid4())
-        # Seteamos la cookie para que el navegador la recuerde
-        # httponly=True hace que javascript no pueda leerla (más seguro)
         response.set_cookie(key="session_id", value=session_id, httponly=True)
-        logger.info(f"🆕 Nueva sesión creada: {session_id}")
-    return session_id
 
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    # Generamos cookie si no existe al cargar la página
-    response = templates.TemplateResponse("index.html", {"request": request})
-
-    if not request.cookies.get("session_id"):
-        new_id = str(uuid.uuid4())
-        response.set_cookie(key="session_id", value=new_id, httponly=True)
+    # Asegurar que la sesión existe en DB
+    db_session = db.query(ChatSession).filter(ChatSession.id == session_id).first()
+    if not db_session:
+        db_session = ChatSession(id=session_id)
+        db.add(db_session)
+        db.commit()
 
     return response
 
 @app.post("/chat")
-async def chat_endpoint(request: Request, response: Response, payload: dict):
-    # Recuperamos el ID del usuario de la cookie
+async def chat_endpoint(request: Request, response: Response, payload: dict, db: Session = Depends(get_db)):
+    # 1. Recuperar Sesión
     session_id = request.cookies.get("session_id")
-
-    # Si por alguna razón no tiene cookie, creamos una al vuelo
     if not session_id:
         session_id = str(uuid.uuid4())
         response.set_cookie(key="session_id", value=session_id, httponly=True)
 
-    # Inicializamos la memoria de ESTE usuario si no existe
-    if session_id not in user_sessions:
-        user_sessions[session_id] = []
-
-    # Alias para la memoria de este usuario específico
-    history = user_sessions[session_id]
+    # Crear sesión en DB si es nueva
+    if not db.query(ChatSession).filter(ChatSession.id == session_id).first():
+        db.add(ChatSession(id=session_id))
+        db.commit()
 
     if not client:
         return JSONResponse(content={"response": "⚠️ Error: Configura la API Key."}, status_code=500)
@@ -82,67 +111,53 @@ async def chat_endpoint(request: Request, response: Response, payload: dict):
         user_text = ""
         mode = payload.get("mode", "amigo")
 
-        # 1. Procesar Audio
+        # 2. Procesar Audio
         if "audio" in payload and payload["audio"]:
-            logger.info(f"🎤 Procesando audio usuario {session_id}...")
             audio_data = base64.b64decode(payload["audio"])
-            # Usamos el session_id en el nombre del archivo para no mezclar audios
             temp_filename = AUDIO_DIR / f"temp_{session_id}.webm"
-
             with open(temp_filename, "wb") as f:
                 f.write(audio_data)
-
             with open(temp_filename, "rb") as audio_file:
                 transcription = client.audio.transcriptions.create(
                     model="whisper-1", file=audio_file, language="es"
                 )
             user_text = transcription.text
-
         elif "message" in payload:
             user_text = payload["message"]
 
         if not user_text:
             return {"response": "No entendí."}
 
-        # 2. Gestión de Memoria e Instrucciones
+        # 3. Guardar Mensaje de Usuario en DB
+        db.add(Message(session_id=session_id, role="user", content=user_text))
+        db.commit()
+
+        # 4. Recuperar Historial (Últimos 10 + System Prompt)
+        # Primero, el system prompt actual
         system_instruction = PROMPTS.get(mode, PROMPTS["amigo"])
+        messages_for_ai = [{"role": "system", "content": system_instruction}]
 
-        # Lógica de System Prompt:
-        # Si la historia está vacía, agregamos el System Prompt.
-        # Si ya tiene datos, verificamos si el mensaje [0] es system y lo actualizamos si cambió el modo.
-        if not history:
-            history.append({"role": "system", "content": system_instruction})
-        else:
-            if history[0]["role"] == "system":
-                history[0]["content"] = system_instruction
+        # Luego, los últimos 10 mensajes de la DB
+        last_messages = db.query(Message).filter(Message.session_id == session_id).order_by(Message.created_at.desc()).limit(10).all()
 
-        # Agregar mensaje del usuario AL HISTORIAL DE SU SESIÓN
-        history.append({"role": "user", "content": user_text})
+        # Los recuperamos en orden inverso (del más nuevo al más viejo), así que hay que darles la vuelta
+        for msg in reversed(last_messages):
+            messages_for_ai.append({"role": msg.role, "content": msg.content})
 
-        # Limitar memoria para no gastar tokens infinitos (Mantenemos últimos 10 mensajes + System Prompt)
-        # Esto es un truco de ahorro de dinero
-        if len(history) > 11:
-            # Mantenemos el index 0 (System) y los últimos 10
-            user_sessions[session_id] = [history[0]] + history[-10:]
-            history = user_sessions[session_id]
-
-        # 3. Llamar a GPT
+        # 5. Llamar a GPT
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=history, 
+            messages=messages_for_ai,
             max_tokens=300,
             temperature=0.7
         )
-
         ai_response = completion.choices[0].message.content
 
-        # Guardar respuesta
-        history.append({"role": "assistant", "content": ai_response})
+        # 6. Guardar Respuesta de IA en DB
+        db.add(Message(session_id=session_id, role="assistant", content=ai_response))
+        db.commit()
 
-        prefix = ""
-        if "audio" in payload:
-            prefix = f"*[🎙️ Escuché: \"{user_text}\"]*\n\n"
-
+        prefix = f"*[🎙️ Escuché: \"{user_text}\"]*\n\n" if "audio" in payload else ""
         return {"response": prefix + ai_response}
 
     except Exception as e:
