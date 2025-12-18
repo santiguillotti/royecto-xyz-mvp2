@@ -1,5 +1,5 @@
 import uvicorn
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from openai import OpenAI
 import logging
+import uuid  # Librería para generar IDs únicos
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,23 +26,54 @@ if not api_key:
 else:
     client = OpenAI(api_key=api_key)
 
-# --- MEMORIA (LISTA GLOBAL) ---
-# En un MVP real, esto debería ser una base de datos o por sesión de usuario.
-# Aquí usamos una lista simple en memoria. Si reinicias el server, se borra.
-conversation_history = []
+# --- MEMORIA POR SESIÓN ---
+# Diccionario para guardar historiales separados por usuario
+# Estructura: { "session_id_xyz": [ {role: user, ...}, ... ] }
+user_sessions = {}
 
 PROMPTS = {
     "amigo": "Eres un amigo cercano y empático. Tu tono es casual, cálido y comprensivo. Recuerda lo que el usuario te ha dicho antes.",
     "profesional": "Eres un terapeuta profesional. Tu tono es clínico pero empático. Analizas patrones. Recuerda el historial del paciente."
 }
 
+# --- GESTIÓN DE COOKIES ---
+async def get_session_id(request: Request, response: Response):
+    session_id = request.cookies.get("session_id")
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        # Seteamos la cookie para que el navegador la recuerde
+        # httponly=True hace que javascript no pueda leerla (más seguro)
+        response.set_cookie(key="session_id", value=session_id, httponly=True)
+        logger.info(f"🆕 Nueva sesión creada: {session_id}")
+    return session_id
+
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    # Generamos cookie si no existe al cargar la página
+    response = templates.TemplateResponse("index.html", {"request": request})
+
+    if not request.cookies.get("session_id"):
+        new_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=new_id, httponly=True)
+
+    return response
 
 @app.post("/chat")
-async def chat_endpoint(payload: dict):
-    global conversation_history
+async def chat_endpoint(request: Request, response: Response, payload: dict):
+    # Recuperamos el ID del usuario de la cookie
+    session_id = request.cookies.get("session_id")
+
+    # Si por alguna razón no tiene cookie, creamos una al vuelo
+    if not session_id:
+        session_id = str(uuid.uuid4())
+        response.set_cookie(key="session_id", value=session_id, httponly=True)
+
+    # Inicializamos la memoria de ESTE usuario si no existe
+    if session_id not in user_sessions:
+        user_sessions[session_id] = []
+
+    # Alias para la memoria de este usuario específico
+    history = user_sessions[session_id]
 
     if not client:
         return JSONResponse(content={"response": "⚠️ Error: Configura la API Key."}, status_code=500)
@@ -52,9 +84,11 @@ async def chat_endpoint(payload: dict):
 
         # 1. Procesar Audio
         if "audio" in payload and payload["audio"]:
-            logger.info("🎤 Procesando audio...")
+            logger.info(f"🎤 Procesando audio usuario {session_id}...")
             audio_data = base64.b64decode(payload["audio"])
-            temp_filename = AUDIO_DIR / "temp_input.webm"
+            # Usamos el session_id en el nombre del archivo para no mezclar audios
+            temp_filename = AUDIO_DIR / f"temp_{session_id}.webm"
+
             with open(temp_filename, "wb") as f:
                 f.write(audio_data)
 
@@ -73,30 +107,37 @@ async def chat_endpoint(payload: dict):
         # 2. Gestión de Memoria e Instrucciones
         system_instruction = PROMPTS.get(mode, PROMPTS["amigo"])
 
-        # Si es el primer mensaje, inicializamos el historial con el System Prompt
-        if not conversation_history:
-            conversation_history.append({"role": "system", "content": system_instruction})
+        # Lógica de System Prompt:
+        # Si la historia está vacía, agregamos el System Prompt.
+        # Si ya tiene datos, verificamos si el mensaje [0] es system y lo actualizamos si cambió el modo.
+        if not history:
+            history.append({"role": "system", "content": system_instruction})
         else:
-            # Si cambiamos de modo a mitad de charla, actualizamos la instrucción base
-            conversation_history[0] = {"role": "system", "content": system_instruction}
+            if history[0]["role"] == "system":
+                history[0]["content"] = system_instruction
 
-        # Agregar mensaje del usuario al historial
-        conversation_history.append({"role": "user", "content": user_text})
+        # Agregar mensaje del usuario AL HISTORIAL DE SU SESIÓN
+        history.append({"role": "user", "content": user_text})
 
-        # 3. Llamar a GPT con TODO el historial
-        logger.info(f"🧠 Enviando historial de {len(conversation_history)} mensajes a GPT...")
+        # Limitar memoria para no gastar tokens infinitos (Mantenemos últimos 10 mensajes + System Prompt)
+        # Esto es un truco de ahorro de dinero
+        if len(history) > 11:
+            # Mantenemos el index 0 (System) y los últimos 10
+            user_sessions[session_id] = [history[0]] + history[-10:]
+            history = user_sessions[session_id]
 
+        # 3. Llamar a GPT
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=conversation_history, # <-- AQUÍ ESTÁ LA MAGIA DE LA MEMORIA
+            messages=history, 
             max_tokens=300,
             temperature=0.7
         )
 
         ai_response = completion.choices[0].message.content
 
-        # Agregar respuesta de la IA al historial
-        conversation_history.append({"role": "assistant", "content": ai_response})
+        # Guardar respuesta
+        history.append({"role": "assistant", "content": ai_response})
 
         prefix = ""
         if "audio" in payload:
