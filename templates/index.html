@@ -12,7 +12,7 @@
         ::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 10px; }
     </style>
 </head>
-<body class="bg-[#FFF5F5] font-sans text-gray-800 h-screen flex overflow-hidden">
+<body class="bg-[#E6F2FF] font-sans text-gray-800 h-screen flex overflow-hidden">
 
     <aside class="w-64 bg-white border-r border-gray-100 flex flex-col justify-between hidden md:flex">
         <div class="p-4 space-y-6">
@@ -45,10 +45,10 @@
         </div>
     </aside>
 
-    <main class="flex-1 flex flex-col relative bg-[#FFF5F5]">
+    <main class="flex-1 flex flex-col relative bg-[#E6F2FF]">
         
         <header class="md:hidden p-4 flex justify-between items-center bg-white border-b">
-            <h1 class="font-bold">ProyectoXYZ</h1>
+            <h1 class="font-bold">Sesion de Psiquiatria de Marle</h1>
             <button><i class="ph ph-list text-2xl"></i></button>
         </header>
 
@@ -65,18 +65,53 @@
 
         </div>
 
-        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#FFF5F5] via-[#FFF5F5] to-transparent pt-10 pb-6 px-4">
+        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#E6F2FF] via-[#E6F2FF] to-transparent pt-10 pb-6 px-4">
             <div class="max-w-3xl mx-auto bg-white rounded-2xl shadow-xl border border-gray-100 p-2 flex items-end gap-2">
                 
-                <button class="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
-                    <div class="flex items-center gap-1 border rounded-full px-3 py-1 text-sm font-medium">
-                        <i class="ph ph-wrench"></i> Herramientas
+                <div class="relative">
+                    <button id="herramientas-btn" class="p-2 text-gray-400 hover:text-gray-600 rounded-lg">
+                        <div class="flex items-center gap-1 border rounded-full px-3 py-1 text-sm font-medium">
+                            <i class="ph ph-wrench"></i> Herramientas
+                        </div>
+                    </button>
+                    <div id="mode-menu" class="hidden absolute bottom-12 left-0 bg-white rounded-lg shadow-lg border border-gray-100 w-48 py-2 z-50">
+                        <button id="mode-profesional" class="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm">
+                            <i class="ph ph-user-circle text-lg"></i>
+                            <div>
+                                <div class="font-medium text-gray-700">Terapeuta profesional</div>
+                                <div class="text-xs text-gray-400">Respuestas clinicas</div>
+                            </div>
+                        </button>
+                        <button id="mode-amigo" class="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2 text-sm">
+                            <i class="ph ph-smiley text-lg"></i>
+                            <div>
+                                <div class="font-medium text-gray-700">Amigo que te escucha</div>
+                                <div class="text-xs text-gray-400">Conversacion empática</div>
+                            </div>
+                        </button>
                     </div>
-                </button>
+                </div>
 
                 <textarea id="user-input" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 p-2 resize-none max-h-32 text-gray-700 placeholder-gray-400 outline-none" placeholder="Escribe aquí..."></textarea>
 
                 <div class="flex items-center gap-2 pb-1 pr-1">
+                    <div id="wave-container" class="hidden flex items-center gap-1 px-2">
+                        <svg id="audio-wave" width="24" height="24" viewBox="0 0 24 24" class="animate-pulse">
+                            <g fill="none" stroke-width="2" stroke-linecap="round">
+                                <line x1="3" y1="12" x2="3" y2="12" stroke="url(#gradient)"></line>
+                                <line x1="8" y1="8" x2="8" y2="16" stroke="url(#gradient)"></line>
+                                <line x1="13" y1="5" x2="13" y2="19" stroke="url(#gradient)"></line>
+                                <line x1="18" y1="8" x2="18" y2="16" stroke="url(#gradient)"></line>
+                                <line x1="23" y1="12" x2="23" y2="12" stroke="url(#gradient)"></line>
+                                <defs>
+                                    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
+                                        <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
+                                    </linearGradient>
+                                </defs>
+                            </g>
+                        </svg>
+                    </div>
                     <button id="mic-btn" class="p-2 text-gray-400 hover:text-gray-600 rounded-full bg-gray-50 border border-gray-200 transition" title="Click to record audio">
                         <i class="ph ph-microphone text-lg"></i>
                     </button>
@@ -97,10 +132,16 @@
         const userInput = document.getElementById('user-input');
         const sendBtn = document.getElementById('send-btn');
         const micBtn = document.getElementById('mic-btn');
+        const herramientasBtn = document.getElementById('herramientas-btn');
+        const modeMenu = document.getElementById('mode-menu');
+        const modoProfesional = document.getElementById('mode-profesional');
+        const modoAmigo = document.getElementById('mode-amigo');
+        const waveContainer = document.getElementById('wave-container');
 
         let mediaRecorder;
         let audioChunks = [];
         let isRecording = false;
+        let currentMode = 'amigo';
 
         function appendMessage(text, isUser) {
             const wrapper = document.createElement('div');
@@ -120,6 +161,7 @@
         }
 
         async function sendMessage(messageData) {
+            messageData.mode = currentMode;
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
@@ -168,6 +210,8 @@
                 mediaRecorder.start();
                 isRecording = true;
                 micBtn.classList.add('bg-red-100', 'text-red-600');
+                waveContainer.classList.remove('hidden');
+                animateWaves();
                 micBtn.title = 'Click to stop recording';
             } catch (error) {
                 console.error("Microphone access denied:", error);
@@ -175,20 +219,54 @@
             }
         }
 
+        let waveAnimation;
+        function animateWaves() {
+            const lines = document.querySelectorAll('#audio-wave line');
+            let frame = 0;
+            const animate = () => {
+                frame++;
+                lines.forEach((line, i) => {
+                    const height = Math.sin((frame + i * 2) * 0.05) * 6 + 8;
+                    line.setAttribute('y2', (12 + height));
+                    line.setAttribute('y1', (12 - height));
+                });
+                if (isRecording) {
+                    waveAnimation = requestAnimationFrame(animate);
+                }
+            };
+            animate();
+        }
+
         function stopRecording() {
             if (mediaRecorder && isRecording) {
                 mediaRecorder.stop();
                 isRecording = false;
+                cancelAnimationFrame(waveAnimation);
+                waveContainer.classList.add('hidden');
                 micBtn.classList.remove('bg-red-100', 'text-red-600');
                 micBtn.title = 'Click to record audio';
             }
         }
 
-        micBtn.addEventListener('click', () => {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                startRecording();
+        herramientasBtn.addEventListener('click', () => {
+            modeMenu.classList.toggle('hidden');
+        });
+
+        modoProfesional.addEventListener('click', () => {
+            currentMode = 'profesional';
+            modeMenu.classList.add('hidden');
+            herramientasBtn.innerHTML = '<div class="flex items-center gap-1 border rounded-full px-3 py-1 text-sm font-medium"><i class="ph ph-user-circle"></i> Terapeuta profesional</div>';
+        });
+
+        modoAmigo.addEventListener('click', () => {
+            currentMode = 'amigo';
+            modeMenu.classList.add('hidden');
+            herramientasBtn.innerHTML = '<div class="flex items-center gap-1 border rounded-full px-3 py-1 text-sm font-medium"><i class="ph ph-smiley"></i> Amigo que te escucha</div>';
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!herramientasBtn.contains(e.target) && !modeMenu.contains(e.target)) {
+                modeMenu.classList.add('hidden');
             }
         });
 

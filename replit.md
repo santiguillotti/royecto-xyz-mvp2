@@ -1,14 +1,14 @@
-# ProyectoXYZ-MVP
+# Sesion de Psiquiatria de Marle - MVP
 
 ## Overview
-A mental health support chat application built with FastAPI. Features a beautiful rose-pink themed UI with empathetic AI responses and audio message support.
+A mental health support chat application built with FastAPI. Features a beautiful light sky-blue themed UI with empathetic AI responses, audio message support, and dual-mode interaction (professional therapist vs. empathetic friend).
 
 ## Project Structure
 ```
 /
-├── main.py              # FastAPI backend server
+├── main.py              # FastAPI backend server with mode-based responses
 ├── templates/
-│   └── index.html       # Rose-themed chat interface with audio recording
+│   └── index.html       # Light blue themed chat interface with audio recording & wave visualization
 ├── audio_messages/      # Stored audio message files
 ├── pyproject.toml       # Python dependencies
 └── replit.md            # This file
@@ -16,23 +16,28 @@ A mental health support chat application built with FastAPI. Features a beautifu
 
 ## Tech Stack
 - **Backend**: FastAPI with Uvicorn
-- **Frontend**: HTML + Tailwind CSS + Phosphor Icons + Web Audio API
+- **Frontend**: HTML + Tailwind CSS + Phosphor Icons + Web Audio API + SVG animations
 - **Templating**: Jinja2
 - **Audio**: WebM format stored on backend
 
 ## Features
-- ✅ Beautiful rose-pink themed responsive UI
+- ✅ Light sky-blue responsive UI with rose/purple accents
+- ✅ Session title: "Sesion de Psiquiatria de Marle"
 - ✅ Text-based chat with empathetic responses
 - ✅ Audio message recording via microphone button
+- ✅ Animated audio wave visualization (rose-to-purple gradient)
+- ✅ Dual-mode interaction via "Herramientas":
+  - "Terapeuta profesional" - Clinical, professional responses
+  - "Amigo que te escucha" - Empathetic, conversational responses
 - ✅ Audio files stored on backend for processing
 - ✅ Sidebar navigation (Home, Bookmarks, Crisis, Profile)
 - ✅ Mobile-responsive design
 
 ## Endpoints
 - `GET /` - Serves the chat interface
-- `POST /chat` - Handles both text messages and audio files
-  - Text: `{ "message": "user text" }`
-  - Audio: `{ "audio": "base64-encoded-audio", "type": "audio/webm" }`
+- `POST /chat` - Handles text, audio, and mode selection
+  - Text: `{ "message": "user text", "mode": "amigo|profesional" }`
+  - Audio: `{ "audio": "base64-encoded-audio", "type": "audio/webm", "mode": "amigo|profesional" }`
 
 ## Running the Application
 The application runs on port 5000 with the command:
@@ -40,8 +45,15 @@ The application runs on port 5000 with the command:
 python main.py
 ```
 
+## Recent Updates
+- Changed background to light sky blue (#E6F2FF)
+- Updated title to "Sesion de Psiquiatria de Marle"
+- Added Herramientas mode selector (Professional Therapist vs. Empathetic Friend)
+- Added animated SVG audio waves (rose-purple gradient) during recording
+- Backend now responds differently based on selected mode
+
 ## Future Enhancements
-- Connect real LLM for intelligent empathetic responses
+- Connect real LLM (OpenAI, Anthropic, etc.) for intelligent responses
 - Add speech-to-text for audio transcription
 - Add persistent chat history with database
 - Implement user authentication

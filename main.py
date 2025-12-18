@@ -19,9 +19,14 @@ async def read_root(request: Request):
 
 @app.post("/chat")
 async def chat_endpoint(payload: dict):
+    mode = payload.get("mode", "amigo")
+    
     if "message" in payload:
         user_message = payload.get("message")
-        bot_response = f"Entiendo que dices: '{user_message}'. Cuéntame más sobre cómo te sientes."
+        if mode == "profesional":
+            bot_response = f"Entiendo. Sobre lo que mencionas: '{user_message}'. Desde una perspectiva clínica, es importante explorar este aspecto más a fondo. ¿Podrías desarrollar más?"
+        else:
+            bot_response = f"Entiendo que dices: '{user_message}'. Cuéntame más sobre cómo te sientes."
     elif "audio" in payload:
         audio_data = payload.get("audio", "")
         audio_type = payload.get("type", "audio/webm")
@@ -34,7 +39,10 @@ async def chat_endpoint(payload: dict):
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
         
-        bot_response = f"Recibí tu mensaje de audio. Estoy aquí para escucharte y apoyarte. ¿Hay algo más que quieras compartir?"
+        if mode == "profesional":
+            bot_response = f"Gracias por compartir tu mensaje de audio. Como profesional, puedo percibir tu tono y emoción. ¿Hay algo específico en lo que pueda ayudarte profesionalmente?"
+        else:
+            bot_response = f"Recibí tu mensaje de audio. Estoy aquí para escucharte y apoyarte. ¿Hay algo más que quieras compartir?"
     else:
         bot_response = "No entiendo el mensaje. Intenta de nuevo."
     
