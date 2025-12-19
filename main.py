@@ -1,5 +1,5 @@
-        import uvicorn
-        from fastapi import FastAPI, Request, Response, HTTPException, Depends, BackgroundTasks
+import uvicorn
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, BackgroundTasks
         from fastapi.responses import HTMLResponse, JSONResponse
         from fastapi.templating import Jinja2Templates
         from fastapi.staticfiles import StaticFiles
