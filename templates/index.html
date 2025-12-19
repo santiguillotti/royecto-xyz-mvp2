@@ -1,1 +1,270 @@
-git add . && git commit -m "Implementando PostgreSQL" && git push origin main
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Marle la Psiquiatra - Soporte</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Ajuste para móviles: Evitar scroll horizontal */
+        body, html { overflow-x: hidden; width: 100%; }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        .audio-bar {
+            transition: height 0.05s ease;
+            background: linear-gradient(to top, #a78bfa, #f472b6);
+            border-radius: 9999px;
+            width: 4px;
+        }
+    </style>
+</head>
+<body class="bg-[#F0F4F8] font-sans text-gray-800 h-[100dvh] flex overflow-hidden w-full">
+
+    <aside class="w-64 bg-white border-r border-gray-100 flex-shrink-0 flex flex-col justify-between hidden md:flex z-20">
+        <div class="p-4 space-y-6">
+            <div class="flex items-center gap-2 px-2 text-indigo-600 font-bold text-xl">
+                <i class="ph ph-brain"></i> El Divan de Marle
+            </div>
+            <nav class="space-y-1">
+                <a href="#" class="flex items-center gap-3 px-3 py-2 text-gray-700 bg-gray-50 rounded-lg font-medium transition">
+                    <i class="ph ph-chat-circle-text text-xl"></i> Chat Activo
+                </a>
+            </nav>
+        </div>
+        <div class="p-4 border-t border-gray-50">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 font-bold">U</div>
+                <div class="text-sm">
+                    <div class="font-bold text-gray-700">Usuario</div>
+                    <div class="text-gray-400">Plan Gratuito</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col h-full relative bg-[#F0F4F8] min-w-0 w-full">
+
+        <header class="md:hidden p-4 flex justify-between items-center bg-white border-b shadow-sm flex-shrink-0 z-10">
+            <h1 class="font-bold text-indigo-900 truncate">Sesión Activa</h1>
+            <button class="text-gray-600"><i class="ph ph-list text-2xl"></i></button>
+        </header>
+
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 scroll-smooth w-full">
+            <div class="flex gap-4 max-w-3xl mx-auto w-full">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 shadow-sm"></div>
+                <div class="bg-white p-4 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 text-gray-700 leading-relaxed max-w-[85%] break-words">
+                    Hola. Soy tu asistente de bienestar. Estoy aquí para escucharte y recordar nuestra conversación. ¿Cómo te sientes hoy?
+                </div>
+            </div>
+        </div>
+
+        <div class="flex-shrink-0 w-full bg-gradient-to-t from-[#F0F4F8] via-[#F0F4F8] to-transparent pt-4 pb-6 px-4 z-10">
+            <div class="max-w-3xl mx-auto bg-white rounded-3xl shadow-xl border border-gray-100 p-2 flex items-end gap-2 relative transition-all duration-300 w-full" id="input-box">
+
+                <div class="relative flex-shrink-0">
+                    <button id="herramientas-btn" class="p-3 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition">
+                        <i class="ph ph-sliders-horizontal text-xl"></i>
+                    </button>
+                    <div id="mode-menu" class="hidden absolute bottom-14 left-0 bg-white rounded-2xl shadow-2xl border border-gray-100 w-64 p-2 z-50 transform origin-bottom-left transition-all">
+                        <div class="text-xs font-bold text-gray-400 uppercase px-3 py-2">Selecciona un modo</div>
+                        <button id="mode-amigo" class="w-full text-left px-3 py-3 hover:bg-gray-50 rounded-xl flex items-center gap-3 transition group">
+                            <div class="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-200"><i class="ph ph-coffee text-lg"></i></div>
+                            <div>
+                                <div class="font-bold text-gray-700 text-sm">Amigo Empático</div>
+                                <div class="text-xs text-gray-400">Escucha casual y cálida</div>
+                            </div>
+                        </button>
+                        <button id="mode-profesional" class="w-full text-left px-3 py-3 hover:bg-gray-50 rounded-xl flex items-center gap-3 transition group">
+                            <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-200"><i class="ph ph-briefcase text-lg"></i></div>
+                            <div>
+                                <div class="font-bold text-gray-700 text-sm">Terapeuta</div>
+                                <div class="text-xs text-gray-400">Enfoque clínico y directo</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <textarea id="user-input" rows="1" class="flex-1 bg-transparent border-none focus:ring-0 p-3 resize-none max-h-32 text-gray-700 placeholder-gray-400 outline-none w-full min-w-0" placeholder="Escribe un mensaje..."></textarea>
+
+                <div id="audio-visualizer" class="hidden absolute inset-0 bg-white rounded-3xl z-10 flex items-center justify-between px-4 w-full">
+                    <div class="flex items-center gap-3 text-red-500 font-medium animate-pulse w-16 flex-shrink-0">
+                        <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                        <span id="timer">00:00</span>
+                    </div>
+                    <div class="flex items-center gap-1 h-8 flex-1 justify-center mx-2 overflow-hidden" id="wave-bars"></div>
+                    <div class="flex items-center gap-2 flex-shrink-0">
+                        <button id="cancel-recording" class="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition" title="Cancelar">
+                            <i class="ph ph-x text-xl"></i>
+                        </button>
+                        <button id="send-audio-btn" class="p-2 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition shadow-md flex items-center justify-center" title="Enviar Audio">
+                            <i class="ph ph-paper-plane-right text-lg"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-1 pb-1 pr-1 flex-shrink-0">
+                    <button id="mic-btn" class="p-3 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition relative group">
+                        <i class="ph ph-microphone text-xl"></i>
+                    </button>
+                    <button id="send-btn" class="p-3 bg-indigo-600 text-white rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 transform hover:scale-105 active:scale-95 flex items-center justify-center">
+                        <i class="ph ph-paper-plane-right text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <p class="text-center text-xs text-gray-400 mt-4">IA con memoria de sesión.</p>
+        </div>
+
+    </main>
+
+    <script>
+        const elements = {
+            chatContainer: document.getElementById('chat-container'),
+            userInput: document.getElementById('user-input'),
+            sendBtn: document.getElementById('send-btn'),
+            micBtn: document.getElementById('mic-btn'),
+            visualizer: document.getElementById('audio-visualizer'),
+            waveBars: document.getElementById('wave-bars'),
+            timer: document.getElementById('timer'),
+            cancelBtn: document.getElementById('cancel-recording'),
+            sendAudioBtn: document.getElementById('send-audio-btn'),
+            herramientasBtn: document.getElementById('herramientas-btn'),
+            modeMenu: document.getElementById('mode-menu'),
+            modeBtns: { amigo: document.getElementById('mode-amigo'), profesional: document.getElementById('mode-profesional') }
+        };
+
+        let state = { isRecording: false, mediaRecorder: null, audioChunks: [], audioContext: null, analyser: null, animationId: null, startTime: null, timerInterval: null, currentMode: 'amigo' };
+
+        function createWaveBars() {
+            elements.waveBars.innerHTML = '';
+            // Reducimos cantidad de barras para móviles pequeños
+            const barCount = window.innerWidth < 768 ? 10 : 20;
+            for (let i = 0; i < barCount; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'audio-bar';
+                bar.style.height = '4px';
+                // Añadimos un pequeño margen para que no se peguen
+                bar.style.margin = '0 1px';
+                elements.waveBars.appendChild(bar);
+            }
+        }
+        createWaveBars();
+
+        function appendMessage(text, isUser) {
+            const wrapper = document.createElement('div');
+            // Aseguramos que el wrapper ocupe ancho completo disponible y centrado
+            wrapper.className = "flex gap-4 w-full " + (isUser ? "justify-end" : "");
+            
+            const avatar = isUser ? '' : `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0 shadow-sm"></div>`;
+            const bubbleStyle = isUser 
+                ? "bg-indigo-600 text-white px-5 py-3 rounded-2xl rounded-tr-sm shadow-md" 
+                : "bg-white text-gray-700 px-5 py-3 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100";
+            
+            // Agregamos 'break-words' para que textos largos no rompan el layout
+            wrapper.innerHTML = `
+                ${!isUser ? avatar : ''}
+                <div class="${bubbleStyle} leading-relaxed max-w-[85%] break-words">
+                    ${text}
+                </div>
+            `;
+            elements.chatContainer.appendChild(wrapper);
+            elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        }
+
+        async function sendMessageToBackend(payload) {
+            payload.mode = state.currentMode;
+            try {
+                const loadingId = 'loading-' + Date.now();
+                appendLoading(loadingId);
+                const response = await fetch('/chat', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                removeLoading(loadingId);
+                appendMessage(data.response, false);
+            } catch (error) {
+                console.error("Error:", error);
+                appendMessage("Error de conexión.", false);
+            }
+        }
+
+        function appendLoading(id) {
+            const wrapper = document.createElement('div'); wrapper.id = id; wrapper.className = "flex gap-4 w-full";
+            wrapper.innerHTML = `<div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex-shrink-0"></div><div class="bg-white p-4 rounded-2xl rounded-tl-sm shadow-sm border border-gray-100 flex gap-1 items-center"><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></div><div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div></div>`;
+            elements.chatContainer.appendChild(wrapper); elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+        }
+        function removeLoading(id) { const el = document.getElementById(id); if(el) el.remove(); }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                state.mediaRecorder = new MediaRecorder(stream); state.audioChunks = [];
+                state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                state.analyser = state.audioContext.createAnalyser(); state.analyser.fftSize = 64;
+                const source = state.audioContext.createMediaStreamSource(stream); source.connect(state.analyser);
+                state.mediaRecorder.ondataavailable = (e) => state.audioChunks.push(e.data);
+                state.mediaRecorder.onstop = async () => {
+                    if (!state.isRecording) return;
+                    const audioBlob = new Blob(state.audioChunks, { type: 'audio/webm' });
+                    const reader = new FileReader();
+                    reader.onloadend = async () => {
+                        const base64Audio = reader.result.split(',')[1];
+                        appendMessage("🎤 Audio enviado", true);
+                        await sendMessageToBackend({ audio: base64Audio });
+                    };
+                    reader.readAsDataURL(audioBlob);
+                    cleanupAudio();
+                };
+                state.mediaRecorder.start(); state.isRecording = true;
+                elements.visualizer.classList.remove('hidden'); startTimer(); animateBars();
+            } catch (err) { alert("Permiso de micrófono denegado."); }
+        }
+
+        function stopRecording(shouldSend) {
+            if (state.mediaRecorder && state.isRecording) {
+                state.isRecording = shouldSend; state.mediaRecorder.stop();
+                elements.visualizer.classList.add('hidden'); stopTimer(); cancelAnimationFrame(state.animationId);
+            }
+        }
+        function cleanupAudio() {
+            if (state.audioContext) state.audioContext.close();
+            const tracks = state.mediaRecorder?.stream.getTracks(); tracks?.forEach(track => track.stop());
+            state.isRecording = false;
+        }
+        function animateBars() {
+            const bufferLength = state.analyser.frequencyBinCount; const dataArray = new Uint8Array(bufferLength);
+            const bars = document.querySelectorAll('.audio-bar');
+            function draw() {
+                if (!state.isRecording) return; state.analyser.getByteFrequencyData(dataArray);
+                bars.forEach((bar, index) => { 
+                    if(bar) {
+                        const value = dataArray[index] || 0; 
+                        bar.style.height = `${Math.max(4, (value / 255) * 40)}px`; 
+                    }
+                });
+                state.animationId = requestAnimationFrame(draw);
+            } draw();
+        }
+        function startTimer() { state.startTime = Date.now(); state.timerInterval = setInterval(() => { const diff = Math.floor((Date.now() - state.startTime) / 1000); elements.timer.innerText = `${Math.floor(diff / 60).toString().padStart(2, '0')}:${(diff % 60).toString().padStart(2, '0')}`; }, 1000); }
+        function stopTimer() { clearInterval(state.timerInterval); elements.timer.innerText = "00:00"; }
+
+        // Event Listeners
+        elements.sendBtn.addEventListener('click', () => { const text = elements.userInput.value.trim(); if(!text) return; appendMessage(text, true); elements.userInput.value = ''; sendMessageToBackend({ message: text }); });
+        elements.userInput.addEventListener('keypress', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (state.isRecording) stopRecording(true); else if (document.activeElement === elements.userInput) elements.sendBtn.click(); } });
+        elements.micBtn.addEventListener('click', startRecording);
+        elements.cancelBtn.addEventListener('click', () => stopRecording(false));
+        elements.sendAudioBtn.addEventListener('click', () => stopRecording(true));
+
+        // UI Helpers
+        elements.herramientasBtn.addEventListener('click', () => elements.modeMenu.classList.toggle('hidden'));
+        document.addEventListener('click', (e) => { if (!elements.herramientasBtn.contains(e.target) && !elements.modeMenu.contains(e.target)) elements.modeMenu.classList.add('hidden'); });
+        elements.modeBtns.amigo.addEventListener('click', () => { state.currentMode = 'amigo'; elements.modeMenu.classList.add('hidden'); elements.herramientasBtn.innerHTML = `<i class="ph ph-coffee text-green-600 text-xl"></i>`; });
+        elements.modeBtns.profesional.addEventListener('click', () => { state.currentMode = 'profesional'; elements.modeMenu.classList.add('hidden'); elements.herramientasBtn.innerHTML = `<i class="ph ph-briefcase text-blue-600 text-xl"></i>`; });
+        
+        // Recalcular barras en resize
+        window.addEventListener('resize', () => createWaveBars());
+    </script>
+</body>
+</html>
